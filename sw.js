@@ -1,6 +1,6 @@
 /* Service worker: guarda a aplicação para abrir sem rede.
    Nunca guarda pedidos à API do Gemini nem nada com dados. */
-var VERSAO = "despesas-v1";
+var VERSAO = "despesas-v4";
 var CONCHA = ["./","./index.html","./manifest.webmanifest",
               "./icone-192.png","./icone-512.png","./icone-maskable-512.png"];
 
