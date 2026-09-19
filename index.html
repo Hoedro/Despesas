@@ -63,7 +63,10 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 
 .margem{margin:18px 0 6px;padding:13px 14px;background:#fff;border-left:3px solid var(--ocre)}
 .margem .v{font-family:var(--serif);font-size:30px;line-height:1}
-.margem .t{font-size:13px;color:var(--suave);margin-top:5px}
+.margem .lab{font-size:13.5px;color:var(--suave);margin-top:5px}
+.margem .conta{font-size:13px;color:var(--tinta);margin-top:9px;padding-top:8px;
+  border-top:1px dotted var(--linha)}
+.margem .t{font-size:13px;color:var(--suave);margin-top:7px}
 .margem.ok{border-color:var(--verde)}
 .margem.prov{border-color:var(--cinza)}
 
@@ -172,6 +175,7 @@ nav svg{width:21px;height:21px;fill:none;stroke:currentColor;stroke-width:1.6;st
 
   <div class="margem" id="caixaMargem">
     <div class="v" id="bMargem">—</div>
+    <div class="lab" id="rotMargem"></div>
     <div class="t" id="txtMargem"></div>
   </div>
 
@@ -655,23 +659,30 @@ function pintarBal(){
   var agora=new Date(), mesActual=(m===mesDe(hoje()));
   var ultimo=new Date(agora.getFullYear(),agora.getMonth()+1,0).getDate();
   var decorridos=agora.getDate(), faltam=ultimo-decorridos;
+  $("bMargem").textContent=eur(b.margem);
+  var conta='<div class="conta">'+eur(b.sobra)+" por gastar + "+eur(b.disp)+
+            " dispensável \u2212 "+eur(cfg.reserva)+" de reserva</div>";
   if(mesActual&&faltam>0){
     cx.classList.add("prov");
-    $("bMargem").textContent=eur(b.margem);
-    var t="Provisório — faltam "+faltam+(faltam===1?" dia":" dias")+" de mês, e ainda tem "+
-          eur(b.sobra)+" por gastar. Só no fecho é que este número quer dizer alguma coisa.";
+    $("rotMargem").textContent="margem provisória";
+    var t="Faltam "+faltam+(faltam===1?" dia":" dias")+" de mês. Enquanto não fechar, este número só diz onde vai.";
     if(decorridos>=5&&b.gasto>0){
-      var proj=b.ficou-(b.gasto/decorridos*ultimo);
-      t+=" Ao ritmo deste mês, fecha com cerca de "+eur(proj)+" por gastar.";
+      var projGasto=b.gasto/decorridos*ultimo;
+      var projMargem=(b.ficou-projGasto)+(b.disp/decorridos*ultimo)-(cfg.reserva||0);
+      t+=" Ao ritmo deste mês, fecha com cerca de "+eur(projMargem)+" de margem.";
     }
-    $("txtMargem").textContent=t;
+    $("txtMargem").innerHTML=conta+'<div class="t" style="margin-top:7px">'+t+"</div>";
   }else{
     cx.classList.toggle("ok",b.margem<=0);
-    $("bMargem").textContent=eur(b.margem);
-    $("txtMargem").textContent=b.margem>0
-      ? "Mês fechado. Sobrou "+eur(b.sobra)+" e gastou "+eur(b.disp)+" em dispensável, acima da reserva de "+
-        eur(cfg.reserva)+". Podia ter ido para eles."
-      : "Mês fechado, dentro da reserva de "+eur(cfg.reserva)+". Não há folga por explicar.";
+    $("rotMargem").textContent="margem do mês";
+    $("txtMargem").innerHTML=conta+'<div class="t" style="margin-top:7px">'+(b.margem>0
+      ? "Mês fechado. Esta folga não foi para eles nem era precisa em reserva."
+      : "Mês fechado, dentro da reserva. Não há folga por explicar.")+"</div>";
+  }
+  if(b.entrou>0){
+    var soma=b.foiEles+b.nec+b.disp+b.sobra;
+    if(Math.abs(soma-b.entrou)>0.02)
+      av.innerHTML+='<div class="aviso mau">As parcelas somam '+eur(soma)+' mas entraram '+eur(b.entrou)+'. Há um lançamento por arrumar.</div>';
   }
 
   var av=$("avisos"); av.innerHTML="";
