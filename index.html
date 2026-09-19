@@ -65,6 +65,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 .margem .v{font-family:var(--serif);font-size:30px;line-height:1}
 .margem .t{font-size:13px;color:var(--suave);margin-top:5px}
 .margem.ok{border-color:var(--verde)}
+.margem.prov{border-color:var(--cinza)}
 
 .grelha{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:20px 0 4px}
 .grelha button{padding:14px 10px;border:1px solid var(--linha);background:#fff;color:var(--tinta);
@@ -121,9 +122,10 @@ textarea{min-height:60px;resize:vertical}
 
 nav{position:fixed;left:0;right:0;bottom:0;height:calc(var(--barra) + env(safe-area-inset-bottom,0px));
   padding-bottom:env(safe-area-inset-bottom,0px);display:flex;background:var(--papel);
-  border-top:1px solid var(--linha);z-index:20}
-nav button{flex:1;background:none;border:none;color:var(--suave);font-size:12.5px;
-  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:0}
+  border-top:1px solid var(--linha);z-index:20;overflow:hidden}
+nav button{flex:1 1 0;min-width:0;background:none;border:none;color:var(--suave);font-size:12.5px;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:0 2px;
+  overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
 nav button[aria-current=page]{color:var(--azul);font-weight:600}
 nav svg{width:21px;height:21px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
 
@@ -648,11 +650,29 @@ function pintarBal(){
   $("lEles").textContent=eur(b.foiEles); $("lNec").textContent=eur(b.nec);
   $("lDis").textContent=eur(b.disp); $("lSob").textContent=eur(b.sobra);
 
-  $("bMargem").textContent=eur(b.margem);
-  $("caixaMargem").classList.toggle("ok",b.margem<=0);
-  $("txtMargem").textContent=b.margem>0
-    ? "Sobrou "+eur(b.sobra)+" e gastou "+eur(b.disp)+" em dispensável, acima da reserva de "+eur(cfg.reserva)+". Podia ter ido para eles."
-    : "Dentro da reserva de "+eur(cfg.reserva)+". Não há folga por explicar este mês.";
+  var cx=$("caixaMargem");
+  cx.classList.remove("ok"); cx.classList.remove("prov");
+  var agora=new Date(), mesActual=(m===mesDe(hoje()));
+  var ultimo=new Date(agora.getFullYear(),agora.getMonth()+1,0).getDate();
+  var decorridos=agora.getDate(), faltam=ultimo-decorridos;
+  if(mesActual&&faltam>0){
+    cx.classList.add("prov");
+    $("bMargem").textContent=eur(b.margem);
+    var t="Provisório — faltam "+faltam+(faltam===1?" dia":" dias")+" de mês, e ainda tem "+
+          eur(b.sobra)+" por gastar. Só no fecho é que este número quer dizer alguma coisa.";
+    if(decorridos>=5&&b.gasto>0){
+      var proj=b.ficou-(b.gasto/decorridos*ultimo);
+      t+=" Ao ritmo deste mês, fecha com cerca de "+eur(proj)+" por gastar.";
+    }
+    $("txtMargem").textContent=t;
+  }else{
+    cx.classList.toggle("ok",b.margem<=0);
+    $("bMargem").textContent=eur(b.margem);
+    $("txtMargem").textContent=b.margem>0
+      ? "Mês fechado. Sobrou "+eur(b.sobra)+" e gastou "+eur(b.disp)+" em dispensável, acima da reserva de "+
+        eur(cfg.reserva)+". Podia ter ido para eles."
+      : "Mês fechado, dentro da reserva de "+eur(cfg.reserva)+". Não há folga por explicar.";
+  }
 
   var av=$("avisos"); av.innerHTML="";
   var pend=movs.filter(function(d){return d.estado==="pendente";}).length;
@@ -880,7 +900,25 @@ function abrirFicha(id){
         return '<div><span>'+esc(i.descricao)+'</span><span>'+esc(i.categoria||"")+" · "+eur(i.valor)+'</span></div>';
       }).join("")+'</div>' : "";
   $("fichaRegra").innerHTML="";
+  avisarTipo();
   mostrar("ficha");
+}
+var SUSPEITA=/pens[aã]o|aliment|contribui|transfer|mb\s*way|encargo|prestac|prestaç/i;
+function avisarTipo(){
+  var velho=$("btVirar");
+  if(velho&&velho.parentNode&&velho.parentNode.parentNode) velho.parentNode.remove();
+  if($("eTipo").value!=="gasto") return;
+  if(!SUSPEITA.test($("eComerciante").value+" "+$("eNotas").value)) return;
+  var d=document.createElement("div");
+  d.className="aviso";
+  d.innerHTML='Isto parece uma entrega, não um gasto seu. '+
+    '<button id="btVirar" type="button" style="border:none;background:none;color:var(--azul);'+
+    'font-weight:600;padding:0;text-decoration:underline">Passar a entrega</button>';
+  $("fichaAviso").appendChild(d);
+  $("btVirar").addEventListener("click",function(){
+    $("eTipo").value="entrega"; camposPorTipo("entrega"); d.remove();
+    $("fichaTitulo").textContent="Entrega";
+  });
 }
 function salvar(){
   var d=movs.filter(function(x){return x.id===fichaId;})[0]; if(!d) return;
@@ -919,6 +957,17 @@ function apagar(){
   guardar("removidos",{id:d.id,quando:new Date().toISOString()})
     .then(function(){return apagarRec("despesas",d.id);})
     .then(recarregar).then(function(){diz("Apagado.");mostrar("bal");});
+}
+function vazio(d){
+  return !(d.valor>0)&&!d.comerciante&&!(d.notas||"").trim()&&!d.imagem&&!(d.totalDespesa>0);
+}
+function limparVazio(){
+  if(!fichaId) return Promise.resolve();
+  var d=movs.filter(function(x){return x.id===fichaId;})[0];
+  if(!d||!vazio(d)) return Promise.resolve();
+  return guardar("removidos",{id:d.id,quando:new Date().toISOString()})
+    .then(function(){return apagarRec("despesas",d.id);})
+    .then(recarregar);
 }
 function lancar(tipo,ajuste){
   var d=novo(tipo); if(ajuste) ajuste(d);
@@ -1036,13 +1085,18 @@ function exportarCsv(){
   }).join("\r\n"),"text/csv");
 }
 
-function mostrar(v){
+function trocar(v){
   vista=v;
   ["bal","mov","mapa","def","ficha"].forEach(function(k){$("v-"+k).classList.toggle("oculto",k!==v);});
   ["bal","mov","mapa","def"].forEach(function(k){
     var b=$("nav-"+k);
     if(k===v) b.setAttribute("aria-current","page"); else b.removeAttribute("aria-current");});
+  if(v!=="ficha") fichaId=null;
   window.scrollTo(0,0); pintar();
+}
+function mostrar(v){
+  if(vista==="ficha"&&v!=="ficha") limparVazio().then(function(){trocar(v);});
+  else trocar(v);
 }
 function pintar(){
   if(vista==="bal") pintarBal();
@@ -1120,7 +1174,9 @@ function ligar(){
   $("btImprimir").addEventListener("click",function(){window.print();});
   $("btCsv").addEventListener("click",exportarCsv);
 
-  $("eTipo").addEventListener("change",function(){camposPorTipo($("eTipo").value);});
+  $("eTipo").addEventListener("change",function(){camposPorTipo($("eTipo").value);avisarTipo();});
+  $("eComerciante").addEventListener("input",avisarTipo);
+  $("eNotas").addEventListener("input",avisarTipo);
   $("eParcela").addEventListener("change",extraCampos);
   $("eTotalDesp").addEventListener("input",extraCampos);
   $("eQuota").addEventListener("input",extraCampos);
